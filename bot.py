@@ -592,6 +592,4 @@ if __name__ == "__main__":
     watcher_thread = threading.Thread(target=watch_firebase_new_posts, daemon=True)
     watcher_thread.start()
     bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=True)
-```[cite: 3]
-
-Railway එකේ deploy කළාට පස්සේ `/adminsakula` ගහලා බලන්න — තවමත් මොකක් හරි log error එකක් ආවොත් ඒක එවන්න, බලමු.
+```[cite: 3, 6]
