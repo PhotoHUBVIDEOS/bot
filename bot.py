@@ -11,7 +11,7 @@ from telebot import types
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8742752757:AAHidJDg_Su2lMRvXv0KtiiyCO-bkadE-i4").strip()
 BOT_USERNAME = os.getenv("BOT_USERNAME", "AutoVideosPHOTOHUBBot").strip()
 PRIVATE_GROUP_ID = int(os.getenv("PRIVATE_GROUP_ID", "-5325520328"))
-FIREBASE_DB_URL = os.getenv("FIREBASE_DB_URL", "[https://photohub-1f63f-default-rtdb.firebaseio.com](https://photohub-1f63f-default-rtdb.firebaseio.com)").rstrip("/")
+FIREBASE_DB_URL = os.getenv("FIREBASE_DB_URL", "https://photohub-1f63f-default-rtdb.firebaseio.com").rstrip("/")
 IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "351222c8862e4aaa2146afbffe30a585").strip()
 
 # Admin Telegram User IDs
@@ -24,7 +24,7 @@ ANONYMOUS_ADMIN_IDS = {1087968824}
 
 # Public Group Notification Settings
 PUBLIC_GROUP_ID = int(os.getenv("PUBLIC_GROUP_ID", "-1003951414350"))
-SITE_URL = os.getenv("SITE_URL", "[https://photohubvideos.github.io/newsite/](https://photohubvideos.github.io/newsite/)").strip()
+SITE_URL = os.getenv("SITE_URL", "https://photohubvideos.github.io/newsite/").strip()
 WATCH_BUTTON_TEXT = os.getenv("WATCH_BUTTON_TEXT", "🔓 Unlock & Watch").strip()
 VAULT_BUTTON_TEXT = os.getenv("VAULT_BUTTON_TEXT", "🌐 PhotoHub Vault").strip()
 
@@ -121,7 +121,7 @@ def upload_bytes_to_imgbb(image_bytes: bytes, title: str = "thumbnail") -> str:
     try:
         b64_image = base64.b64encode(image_bytes).decode("utf-8")
         resp = requests.post(
-            "[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)",
+            "https://api.imgbb.com/1/upload",
             data={
                 "key": IMGBB_API_KEY,
                 "image": b64_image,
@@ -140,7 +140,7 @@ def upload_bytes_to_imgbb(image_bytes: bytes, title: str = "thumbnail") -> str:
 def get_telegram_file_bytes(file_id: str) -> bytes | None:
     try:
         file_info = bot.get_file(file_id)
-        file_url = f"[https://api.telegram.org/file/bot](https://api.telegram.org/file/bot){BOT_TOKEN}/{file_info.file_path}"
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_info.file_path}"
         r = requests.get(file_url, timeout=30)
         if r.status_code == 200:
             return r.content
@@ -174,8 +174,8 @@ def build_group_message_link(chat_id: int, message_id: int) -> str:
     s = str(chat_id)
     if s.startswith("-100"):
         internal_id = s[4:]
-        return f"[https://t.me/c/](https://t.me/c/){internal_id}/{message_id}"
-    return f"[https://t.me/](https://t.me/){BOT_USERNAME}"
+        return f"https://t.me/c/{internal_id}/{message_id}"
+    return f"https://t.me/{BOT_USERNAME}"
 
 
 def build_notification_caption(item: dict, post_key: str | None = None, index_label: str = "") -> str:
@@ -195,6 +195,7 @@ def build_notification_caption(item: dict, post_key: str | None = None, index_la
 
 
 def send_post_to_public_group(item: dict, post_key: str | None = None, index_label: str = "", require_thumb: bool = True) -> bool:
+    """Post එක Public Group එකට යවයි (thumb_url තිබේ නම් photo සමඟ, නැතිනම් text/buttons සමඟ)."""
     if not PUBLIC_GROUP_ID:
         return False
 
@@ -255,6 +256,7 @@ def send_post_to_public_group(item: dict, post_key: str | None = None, index_lab
 
 
 def watch_firebase_new_posts():
+    """Firebase /videos.json හි අලුතින් add වන posts බලා Public Group එකට photo + buttons යවයි."""
     global watcher_initialized
     while True:
         try:
@@ -526,7 +528,7 @@ def handle_group_video(message):
             thumb_url = upload_bytes_to_imgbb(thumb_bytes, title=video.file_unique_id)
 
     group_msg_link = build_group_message_link(message.chat.id, message.message_id)
-    bot_deep_link = f"[https://t.me/](https://t.me/){BOT_USERNAME}?start=vid_{video.file_unique_id}"
+    bot_deep_link = f"https://t.me/{BOT_USERNAME}?start=vid_{video.file_unique_id}"
 
     payload = {
         "title": title,
@@ -592,4 +594,3 @@ if __name__ == "__main__":
     watcher_thread = threading.Thread(target=watch_firebase_new_posts, daemon=True)
     watcher_thread.start()
     bot.infinity_polling(timeout=20, long_polling_timeout=20, skip_pending=True)
-```[cite: 3]
