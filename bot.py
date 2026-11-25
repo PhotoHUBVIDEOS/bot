@@ -195,7 +195,6 @@ def build_notification_caption(item: dict, post_key: str | None = None, index_la
 
 
 def send_post_to_public_group(item: dict, post_key: str | None = None, index_label: str = "", require_thumb: bool = True) -> bool:
-    """Post එක Public Group එකට යවයි (thumb_url තිබේ නම් photo සමඟ, නැතිනම් text/buttons සමඟ)."""
     if not PUBLIC_GROUP_ID:
         return False
 
@@ -256,7 +255,6 @@ def send_post_to_public_group(item: dict, post_key: str | None = None, index_lab
 
 
 def watch_firebase_new_posts():
-    """Firebase /videos.json හි අලුතින් add වන posts බලා Public Group එකට photo + buttons යවයි."""
     global watcher_initialized
     while True:
         try:
@@ -421,14 +419,6 @@ def handle_admin_sakula(message):
     sender = getattr(message, "from_user", None)
     sender_id = getattr(sender, "id", None)
     print(f"[/adminsakula] sender_id={sender_id}, chat_id={message.chat.id}")
-
-    is_admin = (sender_id in ADMIN_IDS) or (sender_id in ANONYMOUS_ADMIN_IDS)
-    if not is_admin:
-        safe_reply(
-            message,
-            f"⛔ මෙම command එක භාවිතා කළ හැක්කේ admin කෙනෙකුට පමණි.\n(Your ID: <code>{escape_html(str(sender_id))}</code>)",
-        )
-        return
 
     status_msg = safe_reply(message, "⏳ Firebase වලින් videos ලබා ගනිමින් පවතී...")
 
