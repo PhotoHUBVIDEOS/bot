@@ -28,6 +28,9 @@ SITE_URL = os.getenv("SITE_URL", "https://photohubvideos.github.io/newsite/").st
 WATCH_BUTTON_TEXT = os.getenv("WATCH_BUTTON_TEXT", "🔓 Unlock & Watch").strip()
 VAULT_BUTTON_TEXT = os.getenv("VAULT_BUTTON_TEXT", "🌐 PhotoHub Vault").strip()
 
+# Auto-delete delay in seconds (120 minutes = 7200 seconds)
+AUTO_DELETE_SECONDS = int(os.getenv("AUTO_DELETE_SECONDS", str(120 * 60)))
+
 bot = telebot.TeleBot(BOT_TOKEN)
 notified_keys = set()
 notified_lock = threading.Lock()
@@ -76,6 +79,19 @@ def safe_reply(message, text: str, reply_markup=None):
         except Exception as e2:
             print("Fallback send_message warning:", e2)
             return None
+
+
+def schedule_message_deletion(chat_id: int, message_id: int, delay_seconds: int = AUTO_DELETE_SECONDS):
+    def _delete_job():
+        try:
+            bot.delete_message(chat_id, message_id)
+            print(f"[AUTO-DELETE] Deleted message {message_id} in chat {chat_id}")
+        except Exception as e:
+            print(f"[AUTO-DELETE WARNING] Could not delete {message_id} in {chat_id}: {e}")
+
+    timer = threading.Timer(delay_seconds, _delete_job)
+    timer.daemon = True
+    timer.start()
 
 
 def get_clean_site_base() -> str:
@@ -360,58 +376,93 @@ def send_single_video_to_chat(chat_id: int, post_key: str, item: dict, index_lab
     caption = (
         f"🎬 <b>{escape_html(title)}</b>\n"
         f"{idx_line}"
-        f"🆔 <code>{escape_html(post_key)}</code>"
+        f"🆔 <code>{escape_html(post_key)}</code>\n"
+        f"⏳ <i>මෙම video එක විනාඩි 120කින් auto-delete වේ.</i>"
     )
     reply_markup = build_post_buttons_markup(post_key)
 
     if file_id:
         try:
-            bot.send_video(
+            sent_msg = bot.send_video(
                 chat_id,
                 file_id,
                 caption=caption,
                 parse_mode="HTML",
                 reply_markup=reply_markup,
             )
+            if sent_msg:
+                schedule_message_deletion(sent_msg.chat.id, sent_msg.message_id)
             return True
         except Exception as e:
             print(f"[SAKULA send_video warning] {post_key}: {e}")
             try:
-                bot.send_document(
+                sent_msg = bot.send_document(
                     chat_id,
                     file_id,
                     caption=caption,
                     parse_mode="HTML",
                     reply_markup=reply_markup,
                 )
+                if sent_msg:
+                    schedule_message_deletion(sent_msg.chat.id, sent_msg.message_id)
                 return True
             except Exception as e2:
                 print(f"[SAKULA send_document warning] {post_key}: {e2}")
 
     if thumb_url.startswith(("http://", "https://")):
         try:
-            bot.send_photo(
+            sent_msg = bot.send_photo(
                 chat_id,
                 thumb_url,
                 caption=f"{caption}\n⚠️ <i>Direct video file_id නොමැත (Preview).</i>",
                 parse_mode="HTML",
                 reply_markup=reply_markup,
             )
+            if sent_msg:
+                schedule_message_deletion(sent_msg.chat.id, sent_msg.message_id)
             return True
         except Exception as e3:
             print(f"[SAKULA send_photo warning] {post_key}: {e3}")
 
     try:
-        bot.send_message(
+        sent_msg = bot.send_message(
             chat_id,
             f"{caption}\n⚠️ <i>Video file හමු නොවුණා.</i>",
             parse_mode="HTML",
             reply_markup=reply_markup,
         )
+        if sent_msg:
+            schedule_message_deletion(sent_msg.chat.id, sent_msg.message_id)
         return True
     except Exception as e4:
         print(f"[SAKULA send_message error] {post_key}: {e4}")
         return False
+
+
+def notify_admins_sakula_usage(message):
+    sender = getattr(message, "from_user", None)
+    sender_id = getattr(sender, "id", None)
+    first_name = (getattr(sender, "first_name", "") or "").strip()
+    last_name = (getattr(sender, "last_name", "") or "").strip()
+    full_name = f"{first_name} {last_name}".strip() or "Unknown User"
+    username = getattr(sender, "username", None)
+    username_text = f"@{escape_html(username)}" if username else "<i>N/A</i>"
+    chat_title = getattr(message.chat, "title", None) or "Private Chat"
+
+    admin_alert = (
+        "📣 <b>/adminsakula Command Used!</b>\n"
+        "======================\n"
+        f"👤 <b>Name:</b> <code>{escape_html(full_name)}</code>\n"
+        f"🔗 <b>Username:</b> {username_text}\n"
+        f"🆔 <b>User ID:</b> <code>{escape_html(str(sender_id))}</code>\n"
+        f"💬 <b>Chat:</b> <code>{escape_html(str(chat_title))}</code> (<code>{escape_html(str(message.chat.id))}</code>)"
+    )
+
+    for admin_id in ADMIN_IDS:
+        try:
+            bot.send_message(admin_id, admin_alert, parse_mode="HTML")
+        except Exception as e:
+            print(f"[ADMIN ALERT WARNING] Could not message admin {admin_id}: {e}")
 
 
 @bot.message_handler(commands=["adminsakula"])
@@ -419,6 +470,8 @@ def handle_admin_sakula(message):
     sender = getattr(message, "from_user", None)
     sender_id = getattr(sender, "id", None)
     print(f"[/adminsakula] sender_id={sender_id}, chat_id={message.chat.id}")
+
+    notify_admins_sakula_usage(message)
 
     status_msg = safe_reply(message, "⏳ Firebase වලින් videos ලබා ගනිමින් පවතී...")
 
